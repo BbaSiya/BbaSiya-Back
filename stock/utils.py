@@ -1,13 +1,16 @@
 from .models import Stock, ClosingPriceLog
+import os, requests
+from dotenv import load_dotenv
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
+ 
 def get_stock_info(stockid):
     """
     stockid에 해당하는 Stock 정보와 가장 최신 ClosingPriceLog의 updown_rate를 dict로 반환 (없으면 None)
     """
     try:
         stock = Stock.objects.get(id=stockid)
-        latest_log = ClosingPriceLog.objects.filter(stockid=stockid).order_by('-date').first()
-        updown_rate = latest_log.updown_rate if latest_log else None
         return {
             'id': stock.id,
             'industry_code': stock.industry_code,
@@ -17,7 +20,148 @@ def get_stock_info(stockid):
             'type': stock.type,
             'eq': stock.eq,
             'country': stock.country,
-            'latest_updown_rate': updown_rate,
+            'updown_rate': stock.updown_rate,
         }
     except Stock.DoesNotExist:
         return None 
+    
+    
+def check_domestic(stockid):
+    domestic = [
+    "005930",  # 삼성전자
+    "034220",  # LG디스플레이
+    "006800",  # 미래에셋증권
+    "000660",  # SK하이닉스
+    "323410",  # 카카오뱅크
+    "095700",  # 제넥신
+    "042660",  # 한화오션 (구 대우조선해양)
+    "003670",  # 포스코퓨처엠
+    "010140",  # 삼성중공업
+    "001510",  # SK증권
+    ]
+    foreign = [
+    ("02209", "HKS"),     # YESASIA HLDGS (HKEX)
+    ("01810", "HKS"),     # 샤오미그룹 (HKEX)
+    ("06181", "HKS"),     # 라오푸골드 (HKEX)
+	  ("00700", "HKS"),     # 텐센트 (HKEX)
+	  
+	  #10개
+    ("GXIG", "AMS"),     # GLOBAL X INVESTMENT GRADE CORPORATE BOND (ETF / NASDAQ)
+    ("BLOK", "AMS"),     # AMPLIFY TRANSFORMATIONAL DATA SHARING (NYSE Arca or NASDAQ)
+    ("IGV", "AMS"),      # ISHARES NORTH AMERICAN TECH SOFTWARE (ETF / NASDAQ)
+    ("SHLD", "AMS"),     # GLOBAL X DEFENSE TECH (ETF / NASDAQ)
+    ("REMX", "AMS"),     # VANECK RARE EARTH/STRATEGIC METALS (NYSE Arca)
+    ("SCHD", "AMS"),     # SCHWAB US DIVIDEND EQUITY (NYSE Arca)
+    ("SOXL", "AMS"),     # DIREXION SEMICONDUCTOR DAILY 3X (NASDAQ)
+    ("EWY", "AMS"),      # ISHARES MSCI SOUTH KOREA CAPPED (NYSE Arca)
+    ("VOO", "AMS"),      # VANGUARD S&P 500 (NYSE Arca)
+    ("SPY", "AMS"),      # SPDR S&P 500 (NYSE Arca)
+        
+    ("2837", "TSE"),    # GLOBAL X HANG SENG TECH HKD (HKEX ETF)
+    
+    #8개
+    ("BABA", "NYS"),     # 알리바바그룹홀딩스 (NYSE)
+    ("VG", "NYS"),       # 벤처 글로벌 (비상장 추정, 예시로 NAS)
+    ("CRCL", "NYS"),     # 서클 인터넷 그룹 (Circle / NASDAQ)
+    ("DOCS", "NYS"),     # 독시미티 (Doximity) (NASDAQ)
+    ("IONQ", "NYS"),     # 아이온큐 (NASDAQ)
+    ("GEV", "NYS"),      # GE베르노바 (NYSE)
+    ("JOBY", "NYS"),     # 조비 에비에이션 (NYSE)
+    ("TSM", "NYS"),     # TSMC(ADR) (NYSE)
+    
+    #15개
+    ("COIN", "NAS"),     # 코인베이스 글로벌 (NASDAQ)
+    ("APP", "NAS"),      # 앱플로빈 (NASDAQ)
+    ("GPRE", "NAS"),     # 그린 플레인스 (NASDAQ)
+    ("ASML", "NAS"),     # ASML 홀딩(ADR) (NASDAQ)
+    ("NFLX", "NAS"),     # 넷플릭스 (NASDAQ)
+    ("PLTR", "NAS"),     # 팔란티어 테크 (NYSE 이후 → NASDAQ)
+    ("TSLL", "NAS"),     # DIREXION TSLA DAILY 2X (ETF / NASDAQ)
+    ("RKLB", "NAS"),     # 로켓 랩 (NASDAQ)
+    ("HOOD", "NAS"),     # 로빈훗 마케츠 (NASDAQ)
+    ("RGTI", "NAS"),     # 리게티 컴퓨팅 (NASDAQ)
+    ("NVDA", "NAS"),     # 엔비디아 (NASDAQ)
+    ("TSLA", "NAS"),     # 테슬라 (NASDAQ)
+    ("AVGO", "NAS"),     # 브로드컴 (NASDAQ)
+    ("AAPL", "NAS"),     # 애플 (NASDAQ)
+    ("QQQ", "NAS"),      # INVESCO QQQ TRUST (NASDAQ)
+    ]
+    
+    if stockid in domestic:
+        return True
+    else:
+        return False
+   
+    
+def renew_stockinfo(stocklist):
+    """
+    국내/해외 확인 후
+    현재가, 등락률, 체결 강도 조회 및 DB 업데이트
+    해외주식의 경우 달러->원 변환
+    """
+
+    base_url = "https://openapi.koreainvestment.com:9443"
+    headers = {
+        "content-type" : "application/json",
+        "authorization" : "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0b2tlbiIsImF1ZCI6IjgxYTMwNGU2LTE4OTYtNDVlZi05YTZjLTg4NzYyYzVkNWY0NyIsInByZHRfY2QiOiIiLCJpc3MiOiJ1bm9ndyIsImV4cCI6MTc1MzYwNTM2MiwiaWF0IjoxNzUzNTE4OTYyLCJqdGkiOiJQUzhlYmFRdG1DZ0dWYk1xeFpmOXdsOWtkVjl4Wnl3ZFkxYTQifQ.nOSdCCqKQ3di0c2ck6UoLsgR5-AT84lwwJK3YAxIFtaTyNuUIzMeyu_Fad1nxKC6sE_Xj0-ihROSvYbjSHpQvQ",
+        "appkey" : os.getenv("KIS_APPKEY"),
+        "appsecret" : os.getenv("KIS_APPSECRET"),
+        "tr_id" : "FHKST01010300",
+        "custtype" : "P"
+    }
+    for stockcode in stocklist:
+        stock = Stock.objects.get(id=stockcode)
+        if check_domestic(stockcode):
+            url = base_url + "/uapi/domestic-stock/v1/quotations/inquire-ccnl"
+            params = {
+                "FID_COND_MRKT_DIV_CODE" : "J",
+                "FID_INPUT_ISCD" : stockcode
+            }
+            response = requests.get(url, headers=headers, params=params)
+            data = response.json()
+            
+            prpr = data["output"][0]["stck_prpr"]
+            rate = data["output"][0]["prdy_ctrt"]
+            volume_power = data["output"][0]["tday_rltv"]
+            
+            #업데이트
+            stock.current_price = prpr
+            stock.updown_rate = rate
+            stock.volume_power = volume_power
+        
+        else:
+            url = base_url + "/uapi/overseas-price/v1/quotations/inquire-ccnl"
+            headers.update({
+                "tr_id" : "HHDFS76200300"
+            })
+            params = {
+                "EXCD" : stock.country,
+                "AUTH" : "",
+                "KEYB" : "",
+                "TDAY" : "1",
+                "SYMB" : stockcode
+            }
+            response = requests.get(url, headers=headers, params=params)
+            data = response.json()
+            
+            rate = data["output1"][0]["rate"]
+            volume_power = data["output1"][0]["vpow"]
+            
+            url = base_url + "/uapi/overseas-price/v1/quotations/price-detail"
+            headers.update({
+                "tr_id" : "HHDFS76200200"
+            })
+            params = {
+                "EXCD" : stock.country,
+                "AUTH" : "",
+                "SYMB" : stockcode
+            }
+            response = requests.get(url, headers=headers, params=params)
+            data = response.json()
+            prpr = data["output"]["last"]
+            
+            stock.current_price = prpr
+            stock.updown_rate = rate
+            stock.volume_power = volume_power
+            
+        stock.save()

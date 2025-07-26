@@ -11,6 +11,7 @@ class Stock(models.Model):
     type = models.CharField(max_length=10, null=True)
     eq = models.IntegerField(null=True)
     country = models.CharField(max_length=2, null=True)
+    updown_rate = models.FloatField(null=True)
 
     class Meta:
         db_table = 'stock'
