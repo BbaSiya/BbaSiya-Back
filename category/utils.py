@@ -1,4 +1,3 @@
-from stock.utils import get_stock_info
 from .models import StockCategory
 
 def get_stockids_by_category(category_id):
