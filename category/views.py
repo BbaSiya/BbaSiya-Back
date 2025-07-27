@@ -27,6 +27,6 @@ class CategoryStockListView(View):
                     'type': stock['type'],
                     'eq': stock['eq'],
                     'country': stock['country'],
-                    'latest_updown_rate': stock['latest_updown_rate'],
+                    'updown_rate': stock['updown_rate'],
                 })
         return JsonResponse(stocks, safe=False)
