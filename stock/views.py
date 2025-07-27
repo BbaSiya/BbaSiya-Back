@@ -6,7 +6,15 @@ from similarity.utils import *
 
 class StockSimilarityView(View):
     def get(self, request, stock_id, user_id):
-        bs = calculate_weighted_similarity(stock_id, user_id)['bs']
+        pattern_scores, bs_scores = vectorized_weighted_similarity(
+            target_stockid=stock_id, 
+            user_id=user_id, 
+            category_stockids=[stock_id], 
+            days=30
+        )
+        
+        bs = bs_scores[0] if len(bs_scores) > 0 else 0.0
+        
         # 임시 데이터 세현오빠 수정 부탁해!!
         news = "삼성전자 실적 개선 예상, 반도체 시장 회복세"
         eq = 75  
@@ -33,8 +41,8 @@ class UserCategoryRecommendationView(View):
         # 같은 type, industry 개수 계산
         similarity_counts = count_similar_stocks_by_user(user_id, most_similar_stock['stockid'])
         
-        # 상위 5개 보유 종목 (비교종목)
-        top5_stocks = get_top5_stocks_by_value(user_id)
+        # 상위 5개 보유 종목 (비교종목) - batch_get_user_stock_info 사용
+        top5_stocks = batch_get_user_stock_info(user_id)
         comparison_stocks = []
         for stockid, name, value, cnt, current_price in top5_stocks:
             comparison_stocks.append({
