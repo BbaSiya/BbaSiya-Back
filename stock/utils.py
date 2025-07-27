@@ -2,14 +2,13 @@ from .models import Stock, ClosingPriceLog
 import os, requests
 from dotenv import load_dotenv
 from pathlib import Path
+from holidayskr import is_holiday
+from datetime import datetime, timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
  
 def get_stock_info(stockid):
-    """
-    stockid에 해당하는 Stock 정보와 가장 최신 ClosingPriceLog의 updown_rate를 dict로 반환 (없으면 None)
-    """
     try:
         stock = Stock.objects.get(id=stockid)
         return {
@@ -92,8 +91,62 @@ def check_domestic(stockid):
         return True
     else:
         return False
-   
-    
+
+
+def recent_business_day():
+    # 한국 시간
+    kst_offset = timedelta(hours=9)
+    now_kst = datetime.utcnow() + kst_offset
+    current_date = now_kst.date()
+
+    while True:
+        # 평일 확인 (월요일=0, 일요일=6)
+        is_weekday = current_date.weekday() < 5
+        # 공휴일 확인
+        is_holiday_status = is_holiday(current_date.strftime("%Y-%m-%d"))
+
+        if is_weekday and not is_holiday_status:
+            return current_date
+        else:
+            current_date -= timedelta(days=1)
+
+
+def find_unit(country):
+    if country == "TSE":
+        return "JPY(100)"
+    elif country == "HKS":
+        return "HKD"
+    else:
+        return "USD"
+
+def replace_comma(price):
+    return float(price.replace(",", ""))
+
+def exchange(cur_unit, prpr):
+    try:
+        url = "https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON"
+        date = recent_business_day()
+        params = {
+            "authkey" : os.getenv("KORAEXIM_API_KEY"),
+            "data" : "AP01",
+            "searchdate" : date
+        }
+        response = requests.get(url, params=params)
+        data = response.json()
+        for item in data:
+            if item.get("cur_unit") == cur_unit:
+                prpr = float(prpr)
+                ttb = replace_comma(item.get("ttb"))
+                if cur_unit == "JPY(100)":
+                    return (prpr*ttb)/100
+                else:
+                    return prpr*ttb
+
+    except Exception as e:
+        print(e)
+        return None
+
+
 def renew_stockinfo(stocklist):
     try:
         """
@@ -163,8 +216,10 @@ def renew_stockinfo(stocklist):
                 if not data["output"]:
                     continue
                 prpr = data["output"]["last"]
+                cur_unit = find_unit(stock.country)
+                changed_price = exchange(cur_unit, prpr)
 
-                stock.current_price = prpr
+                stock.current_price = changed_price
                 stock.updown_rate = rate
                 stock.volume_power = volume_power
 

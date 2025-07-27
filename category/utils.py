@@ -9,9 +9,3 @@ def get_stockids_by_category(category_id):
     renew_stockinfo(stocklist)
     
     return stocklist
-
-'''
-가져와서
-현재가 덮어쓰고 조회하기
-조회하고 갈아끼우고 덮어쓰고 반환하기
-'''
