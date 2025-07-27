@@ -1,4 +1,4 @@
-from .models import Stock, ClosingPriceLog
+from .models import Stock, ClosingPriceLog, Industry
 import os, requests
 from dotenv import load_dotenv
 from pathlib import Path
@@ -227,3 +227,12 @@ def renew_stockinfo(stocklist):
         return None
     except Exception as e:
         print(e)
+        return None
+
+def get_industry_name_by_stockid(stockid):
+    try:
+        stock = Stock.objects.get(id=stockid)
+        industry = Industry.objects.get(industry_code=stock.industry_code)
+        return industry.industry_name
+    except (Stock.DoesNotExist, Industry.DoesNotExist):
+        return None 
