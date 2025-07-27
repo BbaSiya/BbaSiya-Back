@@ -1,6 +1,7 @@
 from .models import Stock, ClosingPriceLog
 import os, requests
 from dotenv import load_dotenv
+from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
@@ -94,74 +95,80 @@ def check_domestic(stockid):
    
     
 def renew_stockinfo(stocklist):
-    """
-    국내/해외 확인 후
-    현재가, 등락률, 체결 강도 조회 및 DB 업데이트
-    해외주식의 경우 달러->원 변환
-    """
+    try:
+        """
+        국내/해외 확인 후
+        현재가, 등락률, 체결 강도 조회 및 DB 업데이트
+        해외주식의 경우 달러->원 변환
+        """
+        base_url = "https://openapi.koreainvestment.com:9443"
+        headers = {
+            "content-type" : "application/json",
+            "authorization" : "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0b2tlbiIsImF1ZCI6ImVkMzcwNTQ3LWYxYzctNDEwMS04MzU3LWJlZmI5YjY5YjU3YiIsInByZHRfY2QiOiIiLCJpc3MiOiJ1bm9ndyIsImV4cCI6MTc1MzY5NDA0NCwiaWF0IjoxNzUzNjA3NjQ0LCJqdGkiOiJQUzhlYmFRdG1DZ0dWYk1xeFpmOXdsOWtkVjl4Wnl3ZFkxYTQifQ.ikevgC1pd3Z3bpoDvOC_DN5TfL5qge2en_K3RHc868LcprovjopL_9VSIdwnKbkrBY8L6Ogr9p9M-8kMapGglQ",
+            "appkey" : os.getenv("KIS_APPKEY"),
+            "appsecret" : os.getenv("KIS_APPSECRET"),
+            "tr_id" : "FHKST01010300",
+            "custtype" : "P"
+        }
+        for stockcode in stocklist:
+            stock = Stock.objects.get(id=stockcode)
+            if check_domestic(stockcode):
+                url = base_url + "/uapi/domestic-stock/v1/quotations/inquire-ccnl"
+                params = {
+                    "FID_COND_MRKT_DIV_CODE" : "J",
+                    "FID_INPUT_ISCD" : stockcode
+                }
+                response = requests.get(url, headers=headers, params=params)
+                data = response.json()
 
-    base_url = "https://openapi.koreainvestment.com:9443"
-    headers = {
-        "content-type" : "application/json",
-        "authorization" : "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0b2tlbiIsImF1ZCI6IjgxYTMwNGU2LTE4OTYtNDVlZi05YTZjLTg4NzYyYzVkNWY0NyIsInByZHRfY2QiOiIiLCJpc3MiOiJ1bm9ndyIsImV4cCI6MTc1MzYwNTM2MiwiaWF0IjoxNzUzNTE4OTYyLCJqdGkiOiJQUzhlYmFRdG1DZ0dWYk1xeFpmOXdsOWtkVjl4Wnl3ZFkxYTQifQ.nOSdCCqKQ3di0c2ck6UoLsgR5-AT84lwwJK3YAxIFtaTyNuUIzMeyu_Fad1nxKC6sE_Xj0-ihROSvYbjSHpQvQ",
-        "appkey" : os.getenv("KIS_APPKEY"),
-        "appsecret" : os.getenv("KIS_APPSECRET"),
-        "tr_id" : "FHKST01010300",
-        "custtype" : "P"
-    }
-    for stockcode in stocklist:
-        stock = Stock.objects.get(id=stockcode)
-        if check_domestic(stockcode):
-            url = base_url + "/uapi/domestic-stock/v1/quotations/inquire-ccnl"
-            params = {
-                "FID_COND_MRKT_DIV_CODE" : "J",
-                "FID_INPUT_ISCD" : stockcode
-            }
-            response = requests.get(url, headers=headers, params=params)
-            data = response.json()
-            
-            prpr = data["output"][0]["stck_prpr"]
-            rate = data["output"][0]["prdy_ctrt"]
-            volume_power = data["output"][0]["tday_rltv"]
-            
-            #업데이트
-            stock.current_price = prpr
-            stock.updown_rate = rate
-            stock.volume_power = volume_power
-        
-        else:
-            url = base_url + "/uapi/overseas-price/v1/quotations/inquire-ccnl"
-            headers.update({
-                "tr_id" : "HHDFS76200300"
-            })
-            params = {
-                "EXCD" : stock.country,
-                "AUTH" : "",
-                "KEYB" : "",
-                "TDAY" : "1",
-                "SYMB" : stockcode
-            }
-            response = requests.get(url, headers=headers, params=params)
-            data = response.json()
-            
-            rate = data["output1"][0]["rate"]
-            volume_power = data["output1"][0]["vpow"]
-            
-            url = base_url + "/uapi/overseas-price/v1/quotations/price-detail"
-            headers.update({
-                "tr_id" : "HHDFS76200200"
-            })
-            params = {
-                "EXCD" : stock.country,
-                "AUTH" : "",
-                "SYMB" : stockcode
-            }
-            response = requests.get(url, headers=headers, params=params)
-            data = response.json()
-            prpr = data["output"]["last"]
-            
-            stock.current_price = prpr
-            stock.updown_rate = rate
-            stock.volume_power = volume_power
-            
-        stock.save()
+                prpr = data["output"][0]["stck_prpr"]
+                rate = data["output"][0]["prdy_ctrt"]
+                volume_power = data["output"][0]["tday_rltv"]
+
+                #업데이트
+                stock.current_price = prpr
+                stock.updown_rate = rate
+                stock.volume_power = volume_power
+
+            else:
+                url = base_url + "/uapi/overseas-price/v1/quotations/inquire-ccnl"
+                headers.update({
+                    "tr_id" : "HHDFS76200300"
+                })
+                params = {
+                    "EXCD" : stock.country,
+                    "AUTH" : "",
+                    "KEYB" : "",
+                    "TDAY" : "1",
+                    "SYMB" : stockcode
+                }
+                response = requests.get(url, headers=headers, params=params)
+                data = response.json()
+                if not data["output1"]:
+                    continue
+                rate = data["output1"][0]["rate"]
+                volume_power = data["output1"][0]["vpow"]
+
+                url = base_url + "/uapi/overseas-price/v1/quotations/price-detail"
+                headers.update({
+                    "tr_id" : "HHDFS76200200"
+                })
+                params = {
+                    "EXCD" : stock.country,
+                    "AUTH" : "",
+                    "SYMB" : stockcode
+                }
+                response = requests.get(url, headers=headers, params=params)
+                data = response.json()
+                if not data["output"]:
+                    continue
+                prpr = data["output"]["last"]
+
+                stock.current_price = prpr
+                stock.updown_rate = rate
+                stock.volume_power = volume_power
+
+            stock.save()
+        return None
+    except Exception as e:
+        print(e)
