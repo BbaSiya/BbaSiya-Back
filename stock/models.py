@@ -24,3 +24,10 @@ class ClosingPriceLog(models.Model):
 
     class Meta:
         db_table = 'closing_price_log'
+
+class Industry(models.Model):
+    industry_code = models.CharField(max_length=10, primary_key=True)
+    industry_name = models.CharField(max_length=10)
+
+    class Meta:
+        db_table = 'industry'

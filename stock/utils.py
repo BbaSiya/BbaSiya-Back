@@ -1,9 +1,6 @@
-from .models import Stock, ClosingPriceLog
+from .models import Stock, ClosingPriceLog, Industry
 
 def get_stock_info(stockid):
-    """
-    stockid에 해당하는 Stock 정보와 가장 최신 ClosingPriceLog의 updown_rate를 dict로 반환 (없으면 None)
-    """
     try:
         stock = Stock.objects.get(id=stockid)
         latest_log = ClosingPriceLog.objects.filter(stockid=stockid).order_by('-date').first()
@@ -20,4 +17,12 @@ def get_stock_info(stockid):
             'latest_updown_rate': updown_rate,
         }
     except Stock.DoesNotExist:
+        return None
+
+def get_industry_name_by_stockid(stockid):
+    try:
+        stock = Stock.objects.get(id=stockid)
+        industry = Industry.objects.get(industry_code=stock.industry_code)
+        return industry.industry_name
+    except (Stock.DoesNotExist, Industry.DoesNotExist):
         return None 
