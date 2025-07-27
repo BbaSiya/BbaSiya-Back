@@ -1,4 +1,4 @@
-from .models import Stock, ClosingPriceLog, Industry
+from .models import Stock, ClosingPriceLog, Industry, KisToken
 import os, requests
 from dotenv import load_dotenv
 from pathlib import Path
@@ -119,8 +119,10 @@ def find_unit(country):
     else:
         return "USD"
 
+
 def replace_comma(price):
     return float(price.replace(",", ""))
+
 
 def exchange(cur_unit, prpr):
     try:
@@ -149,6 +151,8 @@ def exchange(cur_unit, prpr):
 
 def renew_stockinfo(stocklist):
     try:
+        kistoken = KisToken.objects.get(id=1)
+        tokenvalue_string = str(kistoken.tokenvalue)
         """
         국내/해외 확인 후
         현재가, 등락률, 체결 강도 조회 및 DB 업데이트
@@ -157,7 +161,7 @@ def renew_stockinfo(stocklist):
         base_url = "https://openapi.koreainvestment.com:9443"
         headers = {
             "content-type" : "application/json",
-            "authorization" : "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0b2tlbiIsImF1ZCI6ImVkMzcwNTQ3LWYxYzctNDEwMS04MzU3LWJlZmI5YjY5YjU3YiIsInByZHRfY2QiOiIiLCJpc3MiOiJ1bm9ndyIsImV4cCI6MTc1MzY5NDA0NCwiaWF0IjoxNzUzNjA3NjQ0LCJqdGkiOiJQUzhlYmFRdG1DZ0dWYk1xeFpmOXdsOWtkVjl4Wnl3ZFkxYTQifQ.ikevgC1pd3Z3bpoDvOC_DN5TfL5qge2en_K3RHc868LcprovjopL_9VSIdwnKbkrBY8L6Ogr9p9M-8kMapGglQ",
+            "authorization" : "Bearer " + tokenvalue_string,
             "appkey" : os.getenv("KIS_APPKEY"),
             "appsecret" : os.getenv("KIS_APPSECRET"),
             "tr_id" : "FHKST01010300",
