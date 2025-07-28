@@ -1,4 +1,4 @@
-from .models import Stock, ClosingPriceLog, Industry
+from .models import Stock, ClosingPriceLog, Industry, KisToken
 import os, requests
 from dotenv import load_dotenv
 from pathlib import Path
@@ -119,8 +119,10 @@ def find_unit(country):
     else:
         return "USD"
 
+
 def replace_comma(price):
     return float(price.replace(",", ""))
+
 
 def exchange(cur_unit, prpr):
     try:
@@ -149,6 +151,8 @@ def exchange(cur_unit, prpr):
 
 def renew_stockinfo(stocklist):
     try:
+        kistoken = KisToken.objects.get(id=1)
+        tokenvalue_string = str(kistoken.tokenvalue)
         """
         국내/해외 확인 후
         현재가, 등락률, 체결 강도 조회 및 DB 업데이트
@@ -157,7 +161,7 @@ def renew_stockinfo(stocklist):
         base_url = "https://openapi.koreainvestment.com:9443"
         headers = {
             "content-type" : "application/json",
-            "authorization" : "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0b2tlbiIsImF1ZCI6ImVkMzcwNTQ3LWYxYzctNDEwMS04MzU3LWJlZmI5YjY5YjU3YiIsInByZHRfY2QiOiIiLCJpc3MiOiJ1bm9ndyIsImV4cCI6MTc1MzY5NDA0NCwiaWF0IjoxNzUzNjA3NjQ0LCJqdGkiOiJQUzhlYmFRdG1DZ0dWYk1xeFpmOXdsOWtkVjl4Wnl3ZFkxYTQifQ.ikevgC1pd3Z3bpoDvOC_DN5TfL5qge2en_K3RHc868LcprovjopL_9VSIdwnKbkrBY8L6Ogr9p9M-8kMapGglQ",
+            "authorization" : "Bearer " + tokenvalue_string,
             "appkey" : os.getenv("KIS_APPKEY"),
             "appsecret" : os.getenv("KIS_APPSECRET"),
             "tr_id" : "FHKST01010300",
@@ -235,4 +239,34 @@ def get_industry_name_by_stockid(stockid):
         industry = Industry.objects.get(industry_code=stock.industry_code)
         return industry.industry_name
     except (Stock.DoesNotExist, Industry.DoesNotExist):
-        return None 
+        return None
+
+def renew_token():
+    try:
+        print("scheduling...")
+        url = "https://openapi.koreainvestment.com:9443/oauth2/tokenP"
+        body = {
+          "grant_type": "client_credentials",
+          "appsecret": os.getenv("KIS_APPSECRET"),
+          "appkey": os.getenv("KIS_APPKEY")
+        }
+        response = requests.post(url, json=body)
+        access_token = response.json()["access_token"]
+
+        kistoken = KisToken.objects.get(id=1)
+        kistoken.token_value = access_token
+        kistoken.save()
+
+        print("done")
+        return None
+
+    except requests.exceptions.RequestException as e:
+        print(f"API 요청 실패: {e}")
+        return None
+    except KeyError as e:
+        print(f"API 응답에서 'access_token' 키를 찾을 수 없습니다: {e}")
+        print(f"전체 응답: {response.json()}")
+        return None
+    except Exception as e:  # 다른 모든 예외를 잡는 최종 예외 처리
+        print(f"토큰 저장 중 알 수 없는 오류 발생: {e}")
+        return None

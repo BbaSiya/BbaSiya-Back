@@ -32,7 +32,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'similarity',
     'category',
-    'stock'
+    'stock',
+    'django_apscheduler',
 ]
 
 MIDDLEWARE = [ 
@@ -110,3 +111,7 @@ STATIC_URL = 'static/'
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+APSCHEDULER_DATETIME_FORMAT = "N j, Y, f:s a"  # Default
+
+SCHEDULER_DEFAULT = True
