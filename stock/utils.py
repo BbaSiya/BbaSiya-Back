@@ -239,4 +239,34 @@ def get_industry_name_by_stockid(stockid):
         industry = Industry.objects.get(industry_code=stock.industry_code)
         return industry.industry_name
     except (Stock.DoesNotExist, Industry.DoesNotExist):
-        return None 
+        return None
+
+def renew_token():
+    try:
+        print("scheduling...")
+        url = "https://openapi.koreainvestment.com:9443/oauth2/tokenP"
+        body = {
+          "grant_type": "client_credentials",
+          "appsecret": os.getenv("KIS_APPSECRET"),
+          "appkey": os.getenv("KIS_APPKEY")
+        }
+        response = requests.post(url, json=body)
+        access_token = response.json()["access_token"]
+
+        kistoken = KisToken.objects.get(id=1)
+        kistoken.token_value = access_token
+        kistoken.save()
+
+        print("done")
+        return None
+
+    except requests.exceptions.RequestException as e:
+        print(f"API 요청 실패: {e}")
+        return None
+    except KeyError as e:
+        print(f"API 응답에서 'access_token' 키를 찾을 수 없습니다: {e}")
+        print(f"전체 응답: {response.json()}")
+        return None
+    except Exception as e:  # 다른 모든 예외를 잡는 최종 예외 처리
+        print(f"토큰 저장 중 알 수 없는 오류 발생: {e}")
+        return None

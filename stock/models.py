@@ -35,6 +35,6 @@ class Industry(models.Model):
 
 class KisToken(models.Model):
     id = models.AutoField(primary_key=True)
-    tokenvalue = models.TextField
+    token_value = models.TextField()
     class Meta:
         db_table = 'kis_token'
