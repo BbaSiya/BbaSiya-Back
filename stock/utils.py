@@ -150,18 +150,21 @@ def exchange(cur_unit, prpr):
 
 
 def renew_stockinfo(stocklist):
+    idid = ""
     try:
         kistoken = KisToken.objects.get(id=1)
-        tokenvalue_string = str(kistoken.tokenvalue)
+        token_value_string = str(kistoken.token_value)
         """
         국내/해외 확인 후
         현재가, 등락률, 체결 강도 조회 및 DB 업데이트
         해외주식의 경우 달러->원 변환
         """
+        auth = "Bearer " + token_value_string
+        print(auth)
         base_url = "https://openapi.koreainvestment.com:9443"
         headers = {
             "content-type" : "application/json",
-            "authorization" : "Bearer " + tokenvalue_string,
+            "authorization" : auth,
             "appkey" : os.getenv("KIS_APPKEY"),
             "appsecret" : os.getenv("KIS_APPSECRET"),
             "tr_id" : "FHKST01010300",
@@ -169,14 +172,18 @@ def renew_stockinfo(stocklist):
         }
         for stockcode in stocklist:
             stock = Stock.objects.get(id=stockcode)
-            if check_domestic(stockcode):
+            idid = stock.id
+            if stock.country == "KR":
+                print("HIHIHIHIHIHI")
                 url = base_url + "/uapi/domestic-stock/v1/quotations/inquire-ccnl"
                 params = {
                     "FID_COND_MRKT_DIV_CODE" : "J",
-                    "FID_INPUT_ISCD" : stockcode
+                    "FID_INPUT_ISCD" : stock.id
                 }
                 response = requests.get(url, headers=headers, params=params)
                 data = response.json()
+                if stock.id=="001510":
+                    print(data)
 
                 prpr = data["output"][0]["stck_prpr"]
                 rate = data["output"][0]["prdy_ctrt"]
@@ -186,8 +193,10 @@ def renew_stockinfo(stocklist):
                 stock.current_price = prpr
                 stock.updown_rate = rate
                 stock.volume_power = volume_power
+                print(f"{stock.id} 완료")
 
             else:
+                print("DJDJDJDJDJDJ")
                 url = base_url + "/uapi/overseas-price/v1/quotations/inquire-ccnl"
                 headers.update({
                     "tr_id" : "HHDFS76200300"
@@ -226,11 +235,12 @@ def renew_stockinfo(stocklist):
                 stock.current_price = changed_price
                 stock.updown_rate = rate
                 stock.volume_power = volume_power
+                print(f"{stock.id} 완료")
 
             stock.save()
         return None
     except Exception as e:
-        print(e)
+        print(f"{idid}가 문제임")
         return None
 
 def get_industry_name_by_stockid(stockid):
@@ -270,3 +280,7 @@ def renew_token():
     except Exception as e:  # 다른 모든 예외를 잡는 최종 예외 처리
         print(f"토큰 저장 중 알 수 없는 오류 발생: {e}")
         return None
+
+def renew_daily_price():
+    stocklist = list(Stock.objects.values_list('id', flat=True))
+    renew_stockinfo(stocklist)
