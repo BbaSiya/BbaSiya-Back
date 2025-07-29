@@ -1,6 +1,7 @@
 from similarity.models import MyStock
 from stock.models import ClosingPriceLog, Stock, Industry
 from category.utils import get_stockids_by_category
+from similarity.clova_embedding import get_industry_similarity_clova
 import numpy as np
 
 
@@ -191,6 +192,7 @@ def vectorized_weighted_similarity(target_stockid, user_id, category_stockids, d
     
     total_similarities = (total_price_similarities + total_industry_similarities + total_type_similarities) / 3
     
+    
     pattern_result = np.zeros(len(category_stockids))
     bs_result = np.zeros(len(category_stockids))
     
@@ -200,6 +202,9 @@ def vectorized_weighted_similarity(target_stockid, user_id, category_stockids, d
             pattern_result[i] = round(total_price_similarities[valid_idx] * 100, 2)  # 패턴 점수 (소수점 2자리)
             bs_result[i] = round(total_similarities[valid_idx], 2)  # 종합 점수 (소수점 2자리)
     
+    #print("pattern_result: ", pattern_result, " industy_result: ", round(total_industry_similarities[valid_idx] * 100, 2), " total_type_similarities: ", total_type_similarities[valid_idx])
+
+
     return pattern_result, bs_result
 
 
@@ -236,11 +241,7 @@ def get_industry_name_by_stockid(stockid):
 
 
 def get_industry_similarity(name1, name2):
-    if name1 is None or name2 is None:
-        return 0.3  
-    if name1 == name2:
-        return 1.0
-    return 0.5
+    return get_industry_similarity_clova(name1, name2)
 
 
 TYPE_SIM_MATRIX = {
@@ -264,9 +265,6 @@ def get_most_similar_stock_by_category(category_id, user_id, days=30):
     
     pattern_scores, bs_scores = vectorized_weighted_similarity(target_stockid=None, user_id=user_id, 
                                                               category_stockids=category_stockids, days=days)
-    
-    if len(bs_scores) == 0 or np.max(bs_scores) == 0:
-        return None
     
     best_idx = np.argmax(bs_scores)
     best_stockid = category_stockids[best_idx]
