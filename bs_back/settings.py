@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'category',
     'stock',
     'django_apscheduler',
+    'news',
 ]
 
 MIDDLEWARE = [ 

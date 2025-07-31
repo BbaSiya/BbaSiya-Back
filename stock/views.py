@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from django.views import View
 from similarity.utils import *
+from news.utils import *
 # Create your views here.
 
 class StockSimilarityView(View):
@@ -15,9 +16,14 @@ class StockSimilarityView(View):
         
         bs = bs_scores[0] if len(bs_scores) > 0 else 0.0
         
-        # 임시 데이터 세현오빠 수정 부탁해!!
-        news = "삼성전자 실적 개선 예상, 반도체 시장 회복세"
-        eq = 75  
+        # 내가할게 -bbh
+        try:
+            news = news_summary(stock_id)
+        except Exception as e:
+            news = None
+            return JsonResponse({'error': str(e)}, status=500)
+
+        eq = get_sentiment_score(news)
         
         result = {
             'bs': bs,
@@ -62,9 +68,9 @@ class UserCategoryRecommendationView(View):
             stock_history = get_stock_price_history(stockid)
             chart_data.append(stock_history)
         
-        # 임시 데이터 !! 세현오빠 수정 부탁해!!
-        news = "시장 전망 긍정적, 투자자 관심 증가"
-        eq = 78  
+        # 내가할게 -bbh
+        news = news_summary(most_similar_stock['stockid'])
+        eq = get_sentiment_score(news)
         
         # bs 지수
         pattern_similarity = most_similar_stock['pattern_similarity']
